@@ -26,6 +26,9 @@ type keyMap struct {
 	CopyRef key.Binding
 	Owner   key.Binding
 	Related key.Binding
+	// NodePods is enter on a nodes table: Detail moves to d alone there.
+	NodePods   key.Binding
+	NodeDetail key.Binding
 
 	// Object view
 	ModeYAML   key.Binding
@@ -85,6 +88,9 @@ var keys = keyMap{
 	CopyRef: bind("c", "copy name / kubectl command", "c"),
 	Owner:   bind("o", "jump to owner", "o"),
 	Related: bind("J", "jump to related", "J"),
+
+	NodePods:   bind("enter", "pods on this node", "enter"),
+	NodeDetail: bind("d", "detail", "d"),
 
 	ModeYAML:   bind("y", "show yaml", "y"),
 	ModeDetail: bind("d", "show detail", "d"),
