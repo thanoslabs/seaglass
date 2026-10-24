@@ -1,14 +1,14 @@
 #!/usr/bin/env sh
 # seaglass installer. Downloads the latest release binary for your platform.
 #
-#   curl -fsSL https://raw.githubusercontent.com/ctrl-research/seaglass/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/thanoslabs/seaglass/main/install.sh | sh
 #
 # Env:
 #   SEAGLASS_VERSION  install a specific version (e.g. v0.2.0); default latest
 #   SEAGLASS_BIN_DIR  install directory; default ~/.local/bin
 set -eu
 
-REPO="ctrl-research/seaglass"
+REPO="thanoslabs/seaglass"
 BIN_DIR="${SEAGLASS_BIN_DIR:-$HOME/.local/bin}"
 
 os=$(uname -s | tr '[:upper:]' '[:lower:]')

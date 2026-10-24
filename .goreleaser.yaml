@@ -35,18 +35,18 @@ changelog:
 
 release:
   github:
-    owner: ctrl-research
+    owner: thanoslabs
     name: seaglass
   name_template: "v{{ .Version }}"
 
 homebrew_casks:
   - name: seaglass
     repository:
-      owner: ctrl-research
+      owner: thanoslabs
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    homepage: "https://github.com/ctrl-research/seaglass"
-    description: "A Kubernetes TUI with a config-driven operator layer"
+    homepage: "https://github.com/thanoslabs/seaglass"
+    description: "Kubernetes TUI with a config-driven operator layer"
     # Clear macOS quarantine so the unsigned binary runs without a prompt.
     hooks:
       post:
