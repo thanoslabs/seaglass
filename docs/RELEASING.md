@@ -20,7 +20,7 @@ are treated as a patch.
 ## One-time setup (required before the first release)
 
 1. Create the labels `major`, `minor`, `patch` in this repo.
-2. Create a public repo `ctrl-research/homebrew-tap`.
+2. Create a public repo `thanoslabs/homebrew-tap`.
 3. Create a token (a fine-grained PAT or classic token with `contents:write`
    on `homebrew-tap`) and add it to this repo's Actions secrets as
    `HOMEBREW_TAP_TOKEN`. Without it the binary release still publishes; only
@@ -35,5 +35,5 @@ goreleaser build --snapshot --clean  # build without publishing
 
 ## Install paths for users
 
-- Homebrew: `brew install ctrl-research/tap/seaglass`
-- Script: `curl -fsSL https://raw.githubusercontent.com/ctrl-research/seaglass/main/install.sh | sh`
+- Homebrew: `brew install thanoslabs/tap/seaglass`
+- Script: `curl -fsSL https://raw.githubusercontent.com/thanoslabs/seaglass/main/install.sh | sh`

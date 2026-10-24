@@ -8,14 +8,14 @@ resource. See [PLAN.md](PLAN.md) for the roadmap.
 Homebrew:
 
 ```sh
-brew install ctrl-research/tap/seaglass
+brew install thanoslabs/tap/seaglass
 ```
 
 Or the install script (downloads the latest release for your OS/arch to
 `~/.local/bin`):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ctrl-research/seaglass/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/thanoslabs/seaglass/main/install.sh | sh
 ```
 
 Pin a version with `SEAGLASS_VERSION=vX.Y.Z` or change the target with
