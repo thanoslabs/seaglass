@@ -50,7 +50,7 @@ homebrew_casks:
     # Clear macOS quarantine so the unsigned binary runs without a prompt.
     hooks:
       post:
-        install: |
-          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/seaglass"]
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/seaglass"]
           end
