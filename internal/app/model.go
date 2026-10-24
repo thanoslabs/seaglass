@@ -29,7 +29,12 @@ type stateStore interface {
 
 // Options configures the root model.
 type Options struct {
-	Client    *k8s.Client
+	// Client is the cluster connection. When nil, seaglass starts on the
+	// contexts table so the user can pick one (kubeconfig has no current
+	// context).
+	Client *k8s.Client
+	// Contexts seeds the startup contexts table when Client is nil.
+	Contexts  []k8s.ContextInfo
 	Namespace string // "" means all namespaces
 	Resource  k8s.Resource
 	Version   string // seaglass build version for the header
@@ -173,6 +178,18 @@ func New(opts Options) Model {
 	}
 	if m.saveDir == "" {
 		m.saveDir = "."
+	}
+	if opts.Client == nil {
+		// No context to connect to yet: start on the picker.
+		m.contextInfos = opts.Contexts
+		for _, ci := range opts.Contexts {
+			m.contexts = append(m.contexts, ci.Name)
+		}
+		m.rebuildPalette()
+		v := newContextsView(opts.Contexts, "")
+		v.startup = true
+		m.stack = append(m.stack, v)
+		return m
 	}
 	m.pushResource(opts.Resource)
 	return m
@@ -541,6 +558,10 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					names[i] = ci.Name
 				}
 				m.contexts = names
+				if cv, ok := m.top().(*contextsView); ok && cv.startup {
+					cv.infos = msg.infos
+					cv.resize(m.width, m.bodyHeight())
+				}
 			} else {
 				m.contexts = msg.names
 			}
@@ -824,6 +845,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			cmd := m.palette.showWith(copyItems(rv.res, ns, row.Name, ctx), "copy…")
 			rv.resize(m.width, m.bodyHeight())
 			return m, cmd
+		case is(msg, keys.Accept) && isNodes(rv.res):
+			// On nodes, enter drills into the node's pods; d still opens
+			// the detail.
+			row, ok := rv.selectedRow()
+			if !ok {
+				return m, nil
+			}
+			return m, m.navigateRelated(podsOnNode(row.Name))
 		case is(msg, keys.Detail), is(msg, keys.YAML):
 			row, ok := rv.selectedRow()
 			if !ok {
@@ -890,7 +919,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				if m.client != nil && ci.Name == m.client.Context {
 					return m, m.setNotice("already on " + ci.Name)
 				}
-				m.confirm = m.switchClusterConfirm(ci.Name)
+				return m, m.switchCluster(ci.Name)
 			}
 			return m, nil
 		}
@@ -1127,8 +1156,14 @@ func (m *Model) choose(it paletteItem) tea.Cmd {
 		case actionForwards:
 			m.openForwards()
 		case actionEvents:
+			if m.client == nil {
+				return m.setNotice("pick a context first")
+			}
 			return m.openClusterEvents()
 		case actionContexts:
+			if _, ok := m.top().(*contextsView); ok {
+				return nil
+			}
 			m.openContexts()
 		default:
 			if name, ok := strings.CutPrefix(it.Name, "group:"); ok {
@@ -1169,9 +1204,7 @@ func (m *Model) choose(it paletteItem) tea.Cmd {
 		if m.client != nil && it.Name == m.client.Context {
 			return nil
 		}
-		// Switching clusters is disruptive: confirm first.
-		m.confirm = m.switchClusterConfirm(it.Name)
-		return nil
+		return m.switchCluster(it.Name)
 	}
 	return nil
 }
@@ -1232,6 +1265,19 @@ func (m *Model) openContexts() {
 	m.top().stop()
 	m.stack = append(m.stack, v)
 	v.resize(m.width, m.bodyHeight())
+}
+
+// switchCluster moves to another kube context. Switching is disruptive, so
+// it confirms first; with no connection yet there is nothing to lose, so it
+// connects straight away.
+func (m *Model) switchCluster(name string) tea.Cmd {
+	d := m.switchClusterConfirm(name)
+	if m.client != nil {
+		m.confirm = d
+		return nil
+	}
+	m.connecting = d.connecting
+	return d.run(false)
 }
 
 // switchClusterConfirm builds a confirmation for changing kube context.
@@ -1303,6 +1349,7 @@ func (m *Model) useClient(c *k8s.Client) tea.Cmd {
 	for _, v := range m.stack {
 		v.stop()
 	}
+	first := m.client == nil
 	m.client = c
 	// Existing forwards belong to the old cluster; tear them down.
 	for _, af := range m.forwards.list {
@@ -1318,11 +1365,41 @@ func (m *Model) useClient(c *k8s.Client) tea.Cmd {
 	m.serverVersion = ""
 	m.err = nil
 	res := m.currentResource()
+	if first {
+		// Picked from the startup table: resume where this context was
+		// left, as a remembered context does at launch.
+		res = m.restorePosition(c.Context, res)
+	}
 	m.stack = nil
 	m.rebuildPalette()
 	m.pushResource(res)
 	cmds := append([]tea.Cmd{m.startTop()}, m.discoverCmds()...)
 	return tea.Batch(cmds...)
+}
+
+// restorePosition applies the saved namespace for a context and returns
+// its saved resource, or res when nothing is saved.
+func (m *Model) restorePosition(context string, res k8s.Resource) k8s.Resource {
+	if m.state == nil {
+		return res
+	}
+	st, err := m.state.Load()
+	if err != nil {
+		return res
+	}
+	cs, ok := st.For(context)
+	if !ok {
+		return res
+	}
+	if cs.AllNamespaces {
+		m.namespace = ""
+	} else if cs.Namespace != "" {
+		m.namespace = cs.Namespace
+	}
+	if cs.Resource != nil {
+		res = *cs.Resource
+	}
+	return res
 }
 
 // View renders the palette (when open), the top view, and the status bar.

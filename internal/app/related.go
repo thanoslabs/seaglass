@@ -113,10 +113,7 @@ func relatedTargetsFor(res k8s.Resource, namespace, name string, o *unstructured
 		}
 	}
 	if kind == "Node" {
-		out = append(out, relatedTarget{
-			kind: relPodsOnNode, label: "pods on node", detail: "pods scheduled on " + name,
-			nodeName: name, title: "pods on " + name,
-		})
+		out = append(out, podsOnNode(name))
 	}
 	out = append(out, configJumpTargets(res, namespace, o, jumps)...)
 	return out
@@ -278,6 +275,19 @@ func (m Model) handleRelated(msg relatedMsg) (tea.Model, tea.Cmd) {
 		m.top().resize(m.width, m.bodyHeight())
 		return m, cmd
 	}
+}
+
+// podsOnNode targets the pods scheduled on a node.
+func podsOnNode(name string) relatedTarget {
+	return relatedTarget{
+		kind: relPodsOnNode, label: "pods on node", detail: "pods scheduled on " + name,
+		nodeName: name, title: "pods on " + name,
+	}
+}
+
+// isNodes reports whether res is the core nodes resource.
+func isNodes(res k8s.Resource) bool {
+	return res.GVR.Group == "" && res.GVR.Resource == "nodes"
 }
 
 // navigateRelated opens the destination for a related target.

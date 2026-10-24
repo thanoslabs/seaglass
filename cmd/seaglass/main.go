@@ -85,6 +85,31 @@ func run() error {
 		}
 	}
 
+	rules, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	// With no context to use, start on the contexts table instead of failing.
+	if kubeContext == "" {
+		infos, current, err := k8s.ListContextInfos()
+		if err != nil {
+			return err
+		}
+		if current == "" && len(infos) > 0 {
+			slog.Info("starting", "version", version, "context", "(pick)")
+			m := app.New(app.Options{
+				Contexts: infos,
+				Version:  version,
+				State:    store,
+				SaveDir:  ".",
+				Ruleset:  rules,
+			})
+			_, err = tea.NewProgram(m).Run()
+			return err
+		}
+	}
+
 	client, err := k8s.New(kubeContext, namespace)
 	if err != nil {
 		return err
@@ -108,10 +133,6 @@ func run() error {
 	}
 	slog.Info("starting", "version", version, "context", client.Context, "namespace", ns, "resource", res.Name())
 
-	rules, err := config.Load()
-	if err != nil {
-		return err
-	}
 	m := app.New(app.Options{
 		Client:    client,
 		Namespace: ns,

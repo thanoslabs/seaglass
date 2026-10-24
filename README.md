@@ -51,6 +51,10 @@ Debug logs go to `~/.local/state/seaglass/seaglass.log` (or `$XDG_STATE_HOME`).
 seaglass remembers the last context, and per context the last namespace and
 resource, in `state.json` next to the log. Flags override what it remembers.
 
+If there is no context to use (no `--context`, nothing remembered, and no
+`current-context` in kubeconfig), seaglass opens on the contexts table;
+`enter` connects to the selected one.
+
 ## Keys
 
 | Key | Action |
@@ -61,6 +65,7 @@ resource, in `state.json` next to the log. Flags override what it remembers.
 | `s` | Sort by a column (pick from the palette); choose the same column again or press `S` to reverse |
 | `w` | Cycle columns: auto (fit to width), wide (all), narrow (essentials) |
 | `enter` or `d` | Detail view of the selected object: metadata, status, conditions, containers |
+| `enter` on a node | Pods scheduled on that node (across namespaces); `d` still opens the node's detail |
 | `x` | Shell into the selected pod inside the TUI (bash if present, else sh); picks a container when there are several. Keys go to the shell; `ctrl+]` or the shell's own `exit` closes it and returns to the table |
 | `F` | Port-forward the selected pod to a local port; picks or prompts for the remote port. The palette's `port-forwards` panel lists active tunnels and cancels them with `ctrl+d` (after a confirm) |
 | `l` | Logs of the selected pod, all containers merged by time, following |

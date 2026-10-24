@@ -3042,3 +3042,143 @@ func TestConfigListJumpInventory(t *testing.T) {
 		}
 	}
 }
+
+func TestNoContextStartsOnPicker(t *testing.T) {
+	// A kubeconfig with contexts but no current-context; the server is
+	// unreachable, which is fine: only the switch is under test.
+	kc := t.TempDir() + "/config"
+	if err := os.WriteFile(kc, []byte(`apiVersion: v1
+kind: Config
+clusters:
+- name: c1
+  cluster: {server: "https://127.0.0.1:1"}
+users:
+- name: u1
+  user: {token: x}
+contexts:
+- name: alpha
+  context: {cluster: c1, user: u1}
+- name: beta
+  context: {cluster: c1, user: u1, namespace: kube-system}
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("KUBECONFIG", kc)
+
+	store := &memStore{st: config.State{Contexts: map[string]config.ContextState{
+		"beta": {Namespace: "flux-system", Resource: &deployments},
+	}}}
+	m := New(Options{
+		Contexts: []k8s.ContextInfo{
+			{Name: "alpha", Cluster: "c1", User: "u1", Namespace: "default"},
+			{Name: "beta", Cluster: "c1", User: "u1", Namespace: "kube-system"},
+		},
+		State:   store,
+		SaveDir: t.TempDir(),
+	})
+	m.Init()
+	mm, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 24})
+	m = mm.(Model)
+
+	if _, ok := m.top().(*contextsView); !ok {
+		t.Fatalf("no context should start on the contexts table, got %T", m.top())
+	}
+	out := stripANSI(m.View().Content)
+	for _, want := range []string{"alpha", "beta", "no current context"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("startup picker missing %q:\n%s", want, out)
+		}
+	}
+	// esc has nowhere to go; the picker stays.
+	m, _ = press(m, "esc")
+	if _, ok := m.top().(*contextsView); !ok {
+		t.Fatalf("esc should keep the picker, got %T", m.top())
+	}
+	// Views that need a cluster are refused rather than opened.
+	m, _ = press(m, ":")
+	m = typeStr(m, "events")
+	m, _ = press(m, "enter")
+	if _, ok := m.top().(*contextsView); !ok {
+		t.Fatalf("events without a context should not open, got %T", m.top())
+	}
+	if store.saves != 0 {
+		t.Error("nothing should be persisted before a context is picked")
+	}
+
+	// Enter connects straight away: there is nothing to confirm leaving.
+	m, _ = press(m, "down")
+	if sel, _ := m.top().(*contextsView).selected(); sel.Name != "beta" {
+		t.Fatalf("expected beta selected, got %q", sel.Name)
+	}
+	m, cmd := press(m, "enter")
+	if m.confirm != nil {
+		t.Fatal("picking the first context should not confirm")
+	}
+	if m.connecting != "beta" || cmd == nil {
+		t.Fatalf("picking should connect to beta, connecting=%q", m.connecting)
+	}
+	msg := cmd()
+	cm, ok := msg.(clientMsg)
+	if !ok || cm.err != nil {
+		t.Fatalf("expected a client for beta, got %#v", msg)
+	}
+	mm, cmd = m.Update(cm)
+	m = mm.(Model)
+	execCmd(cmd) // includes the state save
+	defer func() {
+		for _, v := range m.stack {
+			v.stop()
+		}
+	}()
+
+	// Connected: the remembered position for beta is restored.
+	if m.client == nil || m.client.Context != "beta" {
+		t.Fatalf("expected client on beta, got %+v", m.client)
+	}
+	top, ok := m.top().(*resourceView)
+	if !ok || top.res.GVR != deployments.GVR {
+		t.Fatalf("expected the saved deployments table, got %T", m.top())
+	}
+	if m.namespace != "flux-system" || len(m.stack) != 1 {
+		t.Errorf("namespace=%q stack=%d, want flux-system and a fresh stack", m.namespace, len(m.stack))
+	}
+	if store.st.LastContext != "beta" {
+		t.Errorf("picked context should be remembered, got %q", store.st.LastContext)
+	}
+}
+
+func TestEnterOnNodeListsItsPods(t *testing.T) {
+	m, fs := newTest(t)
+	m.stack[0].(*resourceView).res = nodes
+	m = feed(m, k8s.Update{Snapshot: k8s.Snapshot{Columns: []k8s.Column{{Name: "Name"}}, Rows: []k8s.Row{{Name: "node-1", Cells: []string{"node-1"}}}}, Status: k8s.StatusLive})
+
+	m, _ = press(m, "enter")
+	pv, ok := m.top().(*resourceView)
+	if !ok || pv.res.GVR != k8s.Pods.GVR || pv.fieldSelector != "spec.nodeName=node-1" {
+		t.Fatalf("enter on a node should list its pods, got %T", m.top())
+	}
+	if last := fs.calls[len(fs.calls)-1]; last != "pods/?spec.nodeName=node-1" {
+		t.Errorf("stream call = %q", last)
+	}
+	if !strings.Contains(stripANSI(m.View().Content), "pods on node-1") {
+		t.Errorf("pods view should be titled for the node:\n%s", stripANSI(m.View().Content))
+	}
+
+	// esc returns to nodes, where d still opens the node's detail.
+	m, _ = press(m, "esc")
+	if rv(m).res.GVR != nodes.GVR {
+		t.Fatalf("esc should return to the nodes table, got %s", rv(m).res.Name())
+	}
+	m, _ = press(m, "d")
+	if ov, ok := m.top().(*objectView); !ok || ov.name != "node-1" || ov.mode != modeDetail {
+		t.Fatalf("d on a node should open its detail, got %T", m.top())
+	}
+
+	// Elsewhere enter is still the detail view.
+	m2, _ := newTest(t)
+	m2 = feed(m2, k8s.Update{Snapshot: snap(), Status: k8s.StatusLive})
+	m2, _ = press(m2, "enter")
+	if _, ok := m2.top().(*objectView); !ok {
+		t.Fatalf("enter on a pod should open its detail, got %T", m2.top())
+	}
+}

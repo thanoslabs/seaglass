@@ -17,6 +17,7 @@ type contextsView struct {
 	current string
 	table   table.Model
 	placed  bool // initial cursor positioned after rows first appear
+	startup bool // shown at launch because no context is set
 }
 
 func newContextsView(infos []k8s.ContextInfo, current string) *contextsView {
@@ -94,7 +95,12 @@ func (v *contextsView) status() viewStatus {
 	return viewStatus{count: itoaInt64(int64(len(v.infos))) + " contexts"}
 }
 
-func (v *contextsView) hint() string { return "enter switch  ↑↓ move" }
+func (v *contextsView) hint() string {
+	if v.startup {
+		return "no current context · enter connect  ↑↓ move"
+	}
+	return "enter switch  ↑↓ move"
+}
 
 func (v *contextsView) help() []helpSection {
 	km := v.table.KeyMap
