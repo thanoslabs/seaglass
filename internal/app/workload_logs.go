@@ -92,6 +92,9 @@ func (v *logsView) watchMembership(d deps, selector string) tea.Cmd {
 	ctx, cancel := context.WithCancel(context.Background())
 	v.memberCancel = cancel
 	updates := d.stream.Stream(ctx, k8s.Pods, v.namespace, "", selector, true)
+	v.membershipUpdates = updates
+	v.membershipCtx = ctx
+	v.membershipGet = d.get
 	id, get, ns := v.id, d.get, v.namespace
 	return func() tea.Msg {
 		for {
@@ -117,6 +120,33 @@ func (v *logsView) watchMembership(d deps, selector string) tea.Cmd {
 					if targets[i].pod != targets[j].pod { return targets[i].pod < targets[j].pod }
 					return targets[i].container < targets[j].container
 				})
+				return membershipMsg{id:id,targets:targets}
+			}
+		}
+	}
+}
+
+func (v *logsView) nextMembership() tea.Cmd {
+	ctx, updates, get, id, ns := v.membershipCtx, v.membershipUpdates, v.membershipGet, v.id, v.namespace
+	if ctx == nil { return nil }
+	return func() tea.Msg {
+		for {
+			select {
+			case <-ctx.Done(): return nil
+			case update, ok := <-updates:
+				if !ok { return nil }
+				if update.Err != nil { return membershipMsg{id:id,err:update.Err} }
+				if update.Status != k8s.StatusLive { continue }
+				var targets []logTarget
+				for _, row := range update.Snapshot.Rows {
+					pod := row.Object
+					if pod == nil {
+						var err error
+						pod, err = get.Get(ctx,k8s.Pods,ns,row.Name)
+						if err != nil { continue }
+					}
+					for _, c := range k8s.Containers(pod) { targets=append(targets,logTarget{pod:row.Name,container:c}) }
+				}
 				return membershipMsg{id:id,targets:targets}
 			}
 		}
