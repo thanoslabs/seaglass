@@ -441,6 +441,9 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case relatedMsg:
 		return m.handleRelated(msg)
 
+	case serviceWorkloadsMsg:
+		return m.handleServiceWorkloads(msg)
+
 	case inventoryLoadedMsg:
 		if iv, ok := m.top().(*inventoryView); ok && iv.id == msg.id {
 			iv.handleLoaded(msg)
