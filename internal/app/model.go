@@ -853,6 +853,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			return m, m.navigateRelated(podsOnNode(row.Name))
+		case is(msg, keys.Accept):
+			row, ok := rv.selectedRow()
+			if !ok { return m, nil }
+			ns := row.Namespace
+			if ns == "" { ns = rv.namespace }
+			return m, m.relatedCommand(rv.res, ns, row.Name, row.Object, true)
 		case is(msg, keys.Detail), is(msg, keys.YAML):
 			row, ok := rv.selectedRow()
 			if !ok {
@@ -900,7 +906,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if gv, ok := top.(*groupView); ok {
 		switch {
-		case is(msg, keys.Detail), is(msg, keys.YAML), is(msg, keys.Accept):
+		case is(msg, keys.Accept):
+			if row, ok := gv.selectedRow(); ok {
+				return m, m.relatedCommand(row.res, row.namespace, row.name, nil, true)
+			}
+			return m, nil
+		case is(msg, keys.Detail), is(msg, keys.YAML):
 			if row, ok := gv.selectedRow(); ok {
 				mode := modeDetail
 				if is(msg, keys.YAML) {
