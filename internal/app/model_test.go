@@ -2601,9 +2601,9 @@ func TestConfigJumpManagedByLabel(t *testing.T) {
 	m, cmd := press(m, "J")
 	mm, _ = m.Update(cmd())
 	m = mm.(Model)
-	ov, ok := m.top().(*objectView)
-	if !ok || ov.res.Kind != "Kustomization" || ov.name != "apps" || ov.namespace != "flux-system" {
-		t.Fatalf("managed-by jump wrong: %T %+v", m.top(), m.top())
+	view, ok := m.top().(*resourceView)
+	if !ok || view.res.Kind != "Kustomization" || view.fieldSelector != "metadata.name=apps" || view.namespace != "flux-system" {
+		t.Fatalf("managed-by jump should open filtered list, got %T", m.top())
 	}
 }
 
