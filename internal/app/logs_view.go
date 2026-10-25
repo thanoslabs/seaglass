@@ -63,7 +63,6 @@ type logsView struct {
 
 	containers []string    // all display names; nil until fetched
 	targets    []logTarget // when non-nil, streams multiple pods
-	membership <-chan []logTarget // live selector snapshots
 	membershipUpdates <-chan k8s.Update
 	membershipCtx context.Context
 	membershipGet getter
