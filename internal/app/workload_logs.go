@@ -1,10 +1,12 @@
 package app
 
 import (
-	tea "charm.land/bubbletea/v2"
 	"context"
-	"github.com/ctrl-research/seaglass/internal/k8s"
 	"time"
+
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/ctrl-research/seaglass/internal/k8s"
 )
 
 type workloadLogsMsg struct {
