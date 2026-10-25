@@ -63,6 +63,9 @@ type logsView struct {
 
 	containers []string    // all display names; nil until fetched
 	targets    []logTarget // when non-nil, streams multiple pods
+	membership <-chan []logTarget // live selector snapshots
+	memberCancel context.CancelFunc
+	generation int
 	selected   string      // "" means all containers
 	opts       k8s.LogOptions
 
@@ -137,6 +140,10 @@ func (v *logsView) start(d deps) tea.Cmd {
 }
 
 func (v *logsView) stop() {
+	if v.memberCancel != nil {
+		v.memberCancel()
+		v.memberCancel = nil
+	}
 	if v.cancel != nil {
 		v.cancel()
 		v.cancel = nil
@@ -146,7 +153,11 @@ func (v *logsView) stop() {
 // restart stops any streams, clears lines, and starts streams for the
 // selected containers with the current options.
 func (v *logsView) restart() tea.Cmd {
-	v.stop()
+	if v.cancel != nil {
+		v.cancel()
+		v.cancel = nil
+	}
+	v.generation++
 	v.lines = nil
 	v.err = nil
 	v.endedMsg = ""
