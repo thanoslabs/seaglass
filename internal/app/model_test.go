@@ -2573,9 +2573,9 @@ func TestConfigJumpFieldRef(t *testing.T) {
 	}
 	mm, _ = m.Update(cmd()) // single target -> navigate
 	m = mm.(Model)
-	ov, ok := m.top().(*objectView)
-	if !ok || ov.res.Kind != "GitRepository" || ov.name != "flux-system" {
-		t.Fatalf("source jump target = %T %+v", m.top(), m.top())
+	view, ok := m.top().(*resourceView)
+	if !ok || view.res.Kind != "GitRepository" || view.fieldSelector != "metadata.name=flux-system" {
+		t.Fatalf("source jump should open filtered list, got %T", m.top())
 	}
 }
 
