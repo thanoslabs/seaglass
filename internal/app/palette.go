@@ -111,7 +111,7 @@ func onOff(b bool) string {
 	return "off"
 }
 
-const palettePlaceholder = "resource, namespace, or context"
+const palettePlaceholder = "resource or command"
 
 var (
 	palInputStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("81")).Bold(true)
@@ -125,7 +125,7 @@ var (
 func newPalette() palette {
 	ti := textinput.New()
 	ti.Prompt = " › "
-	ti.Placeholder = "resource, namespace, or context"
+	ti.Placeholder = palettePlaceholder
 	ti.SetVirtualCursor(true)
 	return palette{input: ti}
 }
@@ -145,9 +145,7 @@ func buildItems(resources []k8s.Resource, namespaces, contexts []string, groups 
 	if len(namespaces) > 0 {
 		items = append(items, paletteItem{Kind: itemNamespace, Label: "all namespaces", Detail: "namespace · every namespace at once", Name: "", search: "ns namespace all -a"})
 	}
-	for _, ns := range namespaces {
-		items = append(items, paletteItem{Kind: itemNamespace, Label: ns, Detail: "namespace", Name: ns, search: strings.ToLower("ns namespace " + ns)})
-	}
+	items = append(items, paletteItem{Kind: itemAction, Label: "ns", Detail: "browse namespaces", Name: "namespaces", search: "ns namespace namespaces", exact: []string{"ns"}})
 	for _, c := range contexts {
 		items = append(items, paletteItem{Kind: itemContext, Label: c, Detail: "context · switch cluster", Name: c, search: strings.ToLower("ctx cluster context " + c)})
 	}
@@ -330,6 +328,10 @@ func (p *palette) update(msg tea.KeyPressMsg) (chosen *paletteItem, closed bool,
 		p.hide()
 		return nil, true, nil
 	case is(msg, keys.Accept):
+		if ns, ok := stripKeyword(strings.TrimSpace(p.input.Value()), "ns"); ok && ns != "" {
+			p.hide()
+			return &paletteItem{Kind:itemNamespace,Name:ns}, true, nil
+		}
 		if it, ok := p.selected(); ok {
 			p.hide()
 			return &it, true, nil
