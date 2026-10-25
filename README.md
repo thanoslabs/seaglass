@@ -1,5 +1,8 @@
 # seaglass
 
+[![CI](https://github.com/thanoslabs/seaglass/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/thanoslabs/seaglass/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/thanoslabs/seaglass?sort=semver&display_name=tag)](https://github.com/thanoslabs/seaglass/releases/latest)
+
 A Kubernetes TUI. Single cluster, live by default, one code path for every
 resource. See [PLAN.md](PLAN.md) for the roadmap.
 
