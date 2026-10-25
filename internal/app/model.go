@@ -444,6 +444,9 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case serviceWorkloadsMsg:
 		return m.handleServiceWorkloads(msg)
 
+	case workloadLogsMsg:
+		return m.handleWorkloadLogs(msg)
+
 	case inventoryLoadedMsg:
 		if iv, ok := m.top().(*inventoryView); ok && iv.id == msg.id {
 			iv.handleLoaded(msg)
@@ -774,12 +777,15 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if !ok {
 				return m, nil
 			}
-			if rv.res.GVR != k8s.Pods.GVR {
-				return m, m.setNotice("logs open from a pod; select one in the pods view")
+			if rv.res.GVR != k8s.Pods.GVR && rv.res.Kind != "Deployment" && rv.res.Kind != "Service" && rv.res.Kind != "StatefulSet" && rv.res.Kind != "DaemonSet" {
+				return m, m.setNotice("logs open from pods or workload resources")
 			}
 			ns := row.Namespace
 			if ns == "" {
 				ns = rv.namespace
+			}
+			if rv.res.GVR != k8s.Pods.GVR {
+				return m, m.resolveWorkloadPods(rv.res, ns, row.Name)
 			}
 			rv.stop()
 			m.pushLogs(ns, row.Name)
@@ -950,7 +956,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if lv, ok := top.(*logsView); ok {
 		switch {
 		case is(msg, keys.LogContainer):
-			if len(lv.containers) == 0 {
+			if lv.targets != nil || len(lv.containers) == 0 {
 				return m, nil
 			}
 			cmd := m.palette.showWith(containerItems(lv.containers, lv.selected), "container")
