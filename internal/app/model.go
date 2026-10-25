@@ -867,6 +867,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if !ok { return m, nil }
 			ns := row.Namespace
 			if ns == "" { ns = rv.namespace }
+			if !m.canDrill(rv.res) {
+				rv.stop()
+				m.pushObject(rv.res, ns, row.Name, modeDetail)
+				return m, m.startTop()
+			}
 			return m, m.relatedCommand(rv.res, ns, row.Name, row.Object, true)
 		case is(msg, keys.Detail), is(msg, keys.YAML):
 			row, ok := rv.selectedRow()
@@ -917,6 +922,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		switch {
 		case is(msg, keys.Accept):
 			if row, ok := gv.selectedRow(); ok {
+				if !m.canDrill(row.res) {
+					gv.stop()
+					m.pushObject(row.res, row.namespace, row.name, modeDetail)
+					return m, m.startTop()
+				}
 				return m, m.relatedCommand(row.res, row.namespace, row.name, nil, true)
 			}
 			return m, nil
