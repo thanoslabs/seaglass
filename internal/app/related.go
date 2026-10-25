@@ -404,7 +404,12 @@ func (m *Model) navigateRelated(t relatedTarget) tea.Cmd {
 			ns = ""
 		}
 		m.top().stop()
-		m.pushObject(target, ns, t.targetName, modeDetail)
+		m.nextID++
+		v := newResourceView(m.nextID, target, ns)
+		v.fieldSelector = "metadata.name=" + t.targetName
+		v.title = target.Kind + "/" + t.targetName
+		m.applyBadges(v)
+		m.stack = append(m.stack, v)
 		return m.startTop()
 	}
 	return nil
