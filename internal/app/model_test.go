@@ -1444,15 +1444,52 @@ func TestLogsSaveAndBack(t *testing.T) {
 	}
 }
 
-func TestLogsOnNonPodIsANotice(t *testing.T) {
-	m := onDeployments(t)
-	m, cmd := press(m, "l")
-	if cmd == nil || len(m.stack) != 2 {
-		t.Fatal("l on a deployment should not push a view")
+func TestLogsOnDeploymentResolvesPods(t *testing.T) {
+	m, _, fg := newTestFull(t)
+	m = onDeploymentsFull(t,m)
+	fg.obj = &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion":"apps/v1","kind":"Deployment",
+		"metadata":map[string]any{"name":"web","namespace":"default"},
+		"spec":map[string]any{"selector":map[string]any{"matchLabels":map[string]any{"app":"web"}}},
+	}}
+	m,cmd := press(m,"l")
+	if cmd == nil { t.Fatal("l should resolve deployment pods") }
+	msg := cmd()
+	if _,ok := msg.(workloadLogsMsg); !ok { t.Fatalf("got %T",msg) }
+}
+
+func TestPrimaryDrillDown(t *testing.T) {
+	m,_,fg := newTestFull(t)
+	m = onDeploymentsFull(t,m)
+	fg.obj = &unstructured.Unstructured{Object:map[string]any{
+		"apiVersion":"apps/v1","kind":"Deployment",
+		"metadata":map[string]any{"name":"web","namespace":"default"},
+		"spec":map[string]any{"selector":map[string]any{"matchLabels":map[string]any{"app":"web"}}},
+	}}
+	m,cmd := press(m,"enter")
+	if cmd==nil { t.Fatal("enter should compute primary link") }
+	mm,_ := m.Update(cmd())
+	m=mm.(Model)
+	view,ok := m.top().(*resourceView)
+	if !ok || view.res.GVR != k8s.Pods.GVR || view.labelSelector!="app=web" {
+		t.Fatalf("expected selected deployment pods; got %T",m.top())
 	}
-	if !strings.Contains(stripANSI(m.View().Content), "logs open from a pod") {
-		t.Error("notice missing")
+}
+
+func TestExternalSecretPrimaryTarget(t *testing.T) {
+	res:=k8s.Resource{GVR:schema.GroupVersionResource{Group:"external-secrets.io",Version:"v1",Resource:"externalsecrets"},Kind:"ExternalSecret",Namespaced:true}
+	obj:=&unstructured.Unstructured{Object:map[string]any{
+		"metadata":map[string]any{"name":"credentials","namespace":"default"},
+		"spec":map[string]any{"target":map[string]any{"name":"app-credentials"}},
+	}}
+	jumps:=[]config.JumpRule{{Name:"target secret",Match:config.Match{Group:"external-secrets.io",Kind:"ExternalSecret"},From:config.JumpFrom{Field:"spec.target"},To:config.Match{Kind:"Secret"}}}
+	targets:=primaryRelatedTargets(res,"default","credentials",obj,relatedTargetsFor(res,"default","credentials",obj,jumps))
+	if len(targets)!=1 || targets[0].targetName!="app-credentials" || targets[0].targetKind!="Secret" {
+		t.Fatalf("external secret jump = %+v",targets)
 	}
+	unstructured.RemoveNestedField(obj.Object,"spec","target")
+	targets=primaryRelatedTargets(res,"default","credentials",obj,relatedTargetsFor(res,"default","credentials",obj,jumps))
+	if len(targets)!=1 || targets[0].targetName!="credentials" { t.Fatalf("default target = %+v",targets) }
 }
 
 func fe(m Model) *fakeExecer { return m.deps.exec.(*fakeExecer) }
