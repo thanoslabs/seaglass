@@ -82,14 +82,14 @@ var keys = keyMap{
 	Reverse: bind("S", "reverse sort", "S"),
 	Rollout: bind("R", "rollout status", "R"),
 	Columns: bind("w", "cycle columns auto/wide/narrow", "w"),
-	Detail:  bind("enter", "detail", "enter", "d"),
+	Detail:  bind("d", "detail", "d"),
 	YAML:    bind("y", "yaml", "y"),
 	Edit:    bind("e", "edit in $EDITOR", "e"),
 	CopyRef: bind("c", "copy name / kubectl command", "c"),
 	Owner:   bind("o", "jump to owner", "o"),
 	Related: bind("J", "jump to related", "J"),
 
-	NodePods:   bind("enter", "pods on this node", "enter"),
+	NodePods:   bind("enter", "drill into related resources", "enter"),
 	NodeDetail: bind("d", "detail", "d"),
 
 	ModeYAML:   bind("y", "show yaml", "y"),
