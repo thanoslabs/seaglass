@@ -864,9 +864,13 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, m.navigateRelated(podsOnNode(row.Name))
 		case is(msg, keys.Accept):
 			row, ok := rv.selectedRow()
-			if !ok { return m, nil }
+			if !ok {
+				return m, nil
+			}
 			ns := row.Namespace
-			if ns == "" { ns = rv.namespace }
+			if ns == "" {
+				ns = rv.namespace
+			}
 			if !m.canDrill(rv.res) {
 				rv.stop()
 				m.pushObject(rv.res, ns, row.Name, modeDetail)

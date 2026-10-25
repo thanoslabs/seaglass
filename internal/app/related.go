@@ -140,7 +140,9 @@ func primaryRelatedTargets(res k8s.Resource, namespace, name string, obj *unstru
 	switch res.Kind {
 	case "Deployment", "StatefulSet", "DaemonSet", "ReplicaSet", "Job", "ReplicationController":
 		for _, t := range targets {
-			if t.kind == relPodsBySelector { return []relatedTarget{t} }
+			if t.kind == relPodsBySelector {
+				return []relatedTarget{t}
+			}
 		}
 	case "Service":
 		if sel, ok := k8s.LabelSelectorString(obj); ok {
@@ -173,9 +175,15 @@ func configJumpTargets(res k8s.Resource, namespace string, o *unstructured.Unstr
 			if !ok && res.Kind == "ExternalSecret" && j.To.Kind == "Secret" && j.From.Field == "spec.target" {
 				name, ok = o.GetName(), true // ESO defaults target.name to metadata.name.
 			}
-			if !ok { continue }
-			if kind == "" { kind = j.To.Kind }
-			if group == "" { group = j.To.Group }
+			if !ok {
+				continue
+			}
+			if kind == "" {
+				kind = j.To.Kind
+			}
+			if group == "" {
+				group = j.To.Group
+			}
 			if ns == "" {
 				ns = namespace
 			}

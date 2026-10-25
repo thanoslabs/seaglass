@@ -52,7 +52,7 @@ var (
 	logEndStyle   = lipgloss.NewStyle().Faint(true).Italic(true)
 )
 
-type logTarget struct { pod, container string }
+type logTarget struct{ pod, container string }
 
 // logsView streams logs for a pod or a selected set of pods.
 type logsView struct {
@@ -61,9 +61,9 @@ type logsView struct {
 	pod       string
 	deps      deps
 
-	containers []string // all display names; nil until fetched
-	targets []logTarget // when non-nil, streams multiple pods
-	selected   string   // "" means all containers
+	containers []string    // all display names; nil until fetched
+	targets    []logTarget // when non-nil, streams multiple pods
+	selected   string      // "" means all containers
 	opts       k8s.LogOptions
 
 	cancel   context.CancelFunc
@@ -90,11 +90,13 @@ type logsView struct {
 }
 
 func newWorkloadLogsView(id int, ns, title, saveDir string, targets []logTarget) *logsView {
- v := newLogsView(id, ns, title, saveDir)
- v.targets = targets
- v.containers = make([]string, 0, len(targets))
- for _, t := range targets { v.containers = append(v.containers,t.pod+"/"+t.container) }
- return v
+	v := newLogsView(id, ns, title, saveDir)
+	v.targets = targets
+	v.containers = make([]string, 0, len(targets))
+	for _, t := range targets {
+		v.containers = append(v.containers, t.pod+"/"+t.container)
+	}
+	return v
 }
 
 func newLogsView(id int, ns, pod, saveDir string) *logsView {
@@ -169,7 +171,10 @@ func (v *logsView) restart() tea.Cmd {
 		pod, container := v.pod, c
 		if v.targets != nil {
 			for _, t := range v.targets {
-				if t.pod+"/"+t.container == c { pod, container = t.pod,t.container; break }
+				if t.pod+"/"+t.container == c {
+					pod, container = t.pod, t.container
+					break
+				}
 			}
 		}
 		ch, err := v.deps.logs.Logs(ctx, v.namespace, pod, container, v.opts)
@@ -180,14 +185,16 @@ func (v *logsView) restart() tea.Cmd {
 		v.streams++
 		go func(ch <-chan k8s.LogEvent, label string) {
 			for ev := range ch {
-				if !ev.Ended && v.targets != nil { ev.Line.Container = label }
+				if !ev.Ended && v.targets != nil {
+					ev.Line.Container = label
+				}
 				select {
 				case merged <- ev:
 				case <-ctx.Done():
 					return
 				}
 			}
-		}(ch,c)
+		}(ch, c)
 	}
 	if len(errs) > 0 {
 		v.err = fmt.Errorf("%s", strings.Join(errs, "; "))
@@ -533,7 +540,9 @@ func (v *logsView) crumbs() []string {
 	if v.selected != "" {
 		label = "logs: " + v.selected
 	}
-	if v.targets != nil { return []string{v.pod,label} }
+	if v.targets != nil {
+		return []string{v.pod, label}
+	}
 	return []string{k8s.Pods.Name(), v.pod, label}
 }
 
@@ -560,7 +569,9 @@ func (v *logsView) status() viewStatus {
 }
 
 func (v *logsView) hint() string {
-	if v.targets != nil { return "s since  t time  w wrap  / filter  ? keys" }
+	if v.targets != nil {
+		return "s since  t time  w wrap  / filter  ? keys"
+	}
 	return "c container  s since  t time  w wrap  / filter  ? keys"
 }
 
