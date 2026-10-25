@@ -170,9 +170,12 @@ func configJumpTargets(res k8s.Resource, namespace string, o *unstructured.Unstr
 		switch {
 		case j.From.Field != "":
 			kind, name, ns, group, ok := k8s.NestedRef(o, j.From.Field)
-			if !ok {
-				continue
+			if !ok && res.Kind == "ExternalSecret" && j.To.Kind == "Secret" && j.From.Field == "spec.target" {
+				name, ok = o.GetName(), true // ESO defaults target.name to metadata.name.
 			}
+			if !ok { continue }
+			if kind == "" { kind = j.To.Kind }
+			if group == "" { group = j.To.Group }
 			if ns == "" {
 				ns = namespace
 			}
