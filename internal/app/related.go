@@ -42,6 +42,8 @@ const (
 	relNode
 	// relObject opens a specific object's detail, resolved by kind/group.
 	relObject
+	// relServiceWorkloads resolves Service-selected pods to owning workloads.
+	relServiceWorkloads
 	// relObjectList opens a browsable list of objects referenced by a field
 	// (e.g. a Flux inventory), driven by a config list jump.
 	relObjectList
@@ -68,15 +70,28 @@ type relatedTarget struct {
 // relatedMsg carries the related targets computed for a source object.
 type relatedMsg struct {
 	targets []relatedTarget
+	primary bool
+	res     k8s.Resource
+	ns      string
+	name    string
 	err     error
 }
 
 // computeRelated fetches an object (unless provided) and derives its
 // related targets.
 func (m *Model) computeRelated(res k8s.Resource, namespace, name string, obj *unstructured.Unstructured) tea.Cmd {
+	return m.relatedCommand(res, namespace, name, obj, false)
+}
+
+// relatedCommand computes alternative jumps for J or one preferred jump for Enter.
+func (m *Model) relatedCommand(res k8s.Resource, namespace, name string, obj *unstructured.Unstructured, primary bool) tea.Cmd {
 	jumps := m.configJumps
 	build := func(o *unstructured.Unstructured) relatedMsg {
-		return relatedMsg{targets: relatedTargetsFor(res, namespace, name, o, jumps)}
+		targets := relatedTargetsFor(res, namespace, name, o, jumps)
+		if primary {
+			targets = primaryRelatedTargets(res, namespace, name, o, targets)
+		}
+		return relatedMsg{targets: targets, primary: primary, res: res, ns: namespace, name: name}
 	}
 	if obj != nil {
 		return func() tea.Msg { return build(obj) }
@@ -119,6 +134,33 @@ func relatedTargetsFor(res k8s.Resource, namespace, name string, o *unstructured
 	return out
 }
 
+// primaryRelatedTargets chooses a logical next resource rather than opening a
+// picker. J still exposes every available jump.
+func primaryRelatedTargets(res k8s.Resource, namespace, name string, obj *unstructured.Unstructured, targets []relatedTarget) []relatedTarget {
+	switch res.Kind {
+	case "Deployment", "StatefulSet", "DaemonSet", "ReplicaSet", "Job", "ReplicationController":
+		for _, t := range targets {
+			if t.kind == relPodsBySelector {
+				return []relatedTarget{t}
+			}
+		}
+	case "Service":
+		if sel, ok := k8s.LabelSelectorString(obj); ok {
+			return []relatedTarget{{kind: relServiceWorkloads, label: "workloads", namespace: namespace, selector: sel, title: "workloads of " + name}}
+		}
+	default:
+		// CRDs use their declared extension jump as the next logical link.
+		if res.GVR.Group != "" && res.GVR.Group != "apps" && res.GVR.Group != "batch" {
+			for _, t := range targets {
+				if t.kind == relObject || t.kind == relObjectList || t.kind == relPodsBySelector {
+					return []relatedTarget{t}
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // configJumpTargets evaluates the config jump rules that match this
 // resource against the object.
 func configJumpTargets(res k8s.Resource, namespace string, o *unstructured.Unstructured, jumps []config.JumpRule) []relatedTarget {
@@ -130,8 +172,17 @@ func configJumpTargets(res k8s.Resource, namespace string, o *unstructured.Unstr
 		switch {
 		case j.From.Field != "":
 			kind, name, ns, group, ok := k8s.NestedRef(o, j.From.Field)
+			if !ok && res.Kind == "ExternalSecret" && j.To.Kind == "Secret" && j.From.Field == "spec.target" {
+				name, ok = o.GetName(), true // ESO defaults target.name to metadata.name.
+			}
 			if !ok {
 				continue
+			}
+			if kind == "" {
+				kind = j.To.Kind
+			}
+			if group == "" {
+				group = j.To.Group
 			}
 			if ns == "" {
 				ns = namespace
@@ -264,6 +315,20 @@ func (m Model) handleRelated(msg relatedMsg) (tea.Model, tea.Cmd) {
 		m.err = msg.err
 		return m, nil
 	}
+	if msg.primary && len(msg.targets) == 0 {
+		// Without a primary relationship, Enter retains the detail behavior.
+		if rv, ok := m.top().(*resourceView); ok {
+			rv.stop()
+			m.pushObject(msg.res, msg.ns, msg.name, modeDetail)
+			return m, m.startTop()
+		}
+		if gv, ok := m.top().(*groupView); ok {
+			gv.stop()
+			m.pushObject(msg.res, msg.ns, msg.name, modeDetail)
+			return m, m.startTop()
+		}
+		return m, nil
+	}
 	switch len(msg.targets) {
 	case 0:
 		return m, m.setNotice("no related resources")
@@ -293,6 +358,8 @@ func isNodes(res k8s.Resource) bool {
 // navigateRelated opens the destination for a related target.
 func (m *Model) navigateRelated(t relatedTarget) tea.Cmd {
 	switch t.kind {
+	case relServiceWorkloads:
+		return m.resolveServiceWorkloads(t)
 	case relPodsBySelector:
 		m.top().stop()
 		m.nextID++
@@ -341,4 +408,20 @@ func (m *Model) navigateRelated(t relatedTarget) tea.Cmd {
 		return m.startTop()
 	}
 	return nil
+}
+
+// canDrill avoids an unnecessary asynchronous fetch on resources without a
+// built-in primary relationship or an extension-provided jump.
+func (m *Model) canDrill(res k8s.Resource) bool {
+	switch res.Kind {
+	case "Deployment", "StatefulSet", "DaemonSet", "ReplicaSet", "Job", "ReplicationController", "Service":
+		return true
+	}
+	for _, jump := range m.configJumps {
+		if jump.Match.Matches(res.GVR.Group, res.GVR.Resource, res.Kind) &&
+			res.GVR.Group != "" && res.GVR.Group != "apps" && res.GVR.Group != "batch" {
+			return true
+		}
+	}
+	return false
 }

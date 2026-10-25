@@ -441,6 +441,12 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case relatedMsg:
 		return m.handleRelated(msg)
 
+	case serviceWorkloadsMsg:
+		return m.handleServiceWorkloads(msg)
+
+	case workloadLogsMsg:
+		return m.handleWorkloadLogs(msg)
+
 	case inventoryLoadedMsg:
 		if iv, ok := m.top().(*inventoryView); ok && iv.id == msg.id {
 			iv.handleLoaded(msg)
@@ -771,12 +777,15 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if !ok {
 				return m, nil
 			}
-			if rv.res.GVR != k8s.Pods.GVR {
-				return m, m.setNotice("logs open from a pod; select one in the pods view")
+			if rv.res.GVR != k8s.Pods.GVR && rv.res.Kind != "Deployment" && rv.res.Kind != "Service" && rv.res.Kind != "StatefulSet" && rv.res.Kind != "DaemonSet" {
+				return m, m.setNotice("logs open from pods or workload resources")
 			}
 			ns := row.Namespace
 			if ns == "" {
 				ns = rv.namespace
+			}
+			if rv.res.GVR != k8s.Pods.GVR {
+				return m, m.resolveWorkloadPods(rv.res, ns, row.Name)
 			}
 			rv.stop()
 			m.pushLogs(ns, row.Name)
@@ -853,6 +862,21 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			return m, m.navigateRelated(podsOnNode(row.Name))
+		case is(msg, keys.Accept):
+			row, ok := rv.selectedRow()
+			if !ok {
+				return m, nil
+			}
+			ns := row.Namespace
+			if ns == "" {
+				ns = rv.namespace
+			}
+			if !m.canDrill(rv.res) {
+				rv.stop()
+				m.pushObject(rv.res, ns, row.Name, modeDetail)
+				return m, m.startTop()
+			}
+			return m, m.relatedCommand(rv.res, ns, row.Name, row.Object, true)
 		case is(msg, keys.Detail), is(msg, keys.YAML):
 			row, ok := rv.selectedRow()
 			if !ok {
@@ -900,7 +924,17 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if gv, ok := top.(*groupView); ok {
 		switch {
-		case is(msg, keys.Detail), is(msg, keys.YAML), is(msg, keys.Accept):
+		case is(msg, keys.Accept):
+			if row, ok := gv.selectedRow(); ok {
+				if !m.canDrill(row.res) {
+					gv.stop()
+					m.pushObject(row.res, row.namespace, row.name, modeDetail)
+					return m, m.startTop()
+				}
+				return m, m.relatedCommand(row.res, row.namespace, row.name, nil, true)
+			}
+			return m, nil
+		case is(msg, keys.Detail), is(msg, keys.YAML):
 			if row, ok := gv.selectedRow(); ok {
 				mode := modeDetail
 				if is(msg, keys.YAML) {
@@ -936,7 +970,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if lv, ok := top.(*logsView); ok {
 		switch {
 		case is(msg, keys.LogContainer):
-			if len(lv.containers) == 0 {
+			if lv.targets != nil || len(lv.containers) == 0 {
 				return m, nil
 			}
 			cmd := m.palette.showWith(containerItems(lv.containers, lv.selected), "container")

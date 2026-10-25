@@ -349,10 +349,7 @@ func (v *resourceView) hint() string {
 
 func (v *resourceView) help() []helpSection {
 	km := v.table.KeyMap
-	detail := []key.Binding{keys.Detail}
-	if isNodes(v.res) {
-		detail = []key.Binding{keys.NodePods, keys.NodeDetail}
-	}
+	detail := []key.Binding{keys.NodePods, keys.Detail}
 	table := append([]key.Binding{keys.Filter, keys.Sort, keys.Reverse, keys.Columns, keys.Rollout}, detail...)
 	return []helpSection{
 		{"Table", append(table, keys.YAML, keys.Edit, keys.CopyRef, keys.Owner, keys.Related, keys.Events, keys.Logs, keys.Shell, keys.Forwards)},
