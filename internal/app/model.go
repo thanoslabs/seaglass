@@ -538,6 +538,13 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case membershipMsg:
+		if lv, ok := m.top().(*logsView); ok && lv.id == msg.id {
+			if msg.err != nil { lv.err = msg.err } else { lv.applyMembership(msg.targets) }
+			return m, lv.nextMembership()
+		}
+		return m, nil
+
 	case resourcesMsg:
 		if msg.err != nil {
 			m.err = msg.err
