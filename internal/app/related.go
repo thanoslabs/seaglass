@@ -401,3 +401,19 @@ func (m *Model) navigateRelated(t relatedTarget) tea.Cmd {
 	}
 	return nil
 }
+
+// canDrill avoids an unnecessary asynchronous fetch on resources without a
+// built-in primary relationship or an extension-provided jump.
+func (m *Model) canDrill(res k8s.Resource) bool {
+	switch res.Kind {
+	case "Deployment", "StatefulSet", "DaemonSet", "ReplicaSet", "Job", "ReplicationController", "Service":
+		return true
+	}
+	for _, jump := range m.configJumps {
+		if jump.Match.Matches(res.GVR.Group, res.GVR.Resource, res.Kind) &&
+			res.GVR.Group != "" && res.GVR.Group != "apps" && res.GVR.Group != "batch" {
+			return true
+		}
+	}
+	return false
+}
