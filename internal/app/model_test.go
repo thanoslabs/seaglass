@@ -1454,8 +1454,7 @@ func TestLogsOnDeploymentResolvesPods(t *testing.T) {
 	}}
 	m,cmd := press(m,"l")
 	if cmd == nil { t.Fatal("l should resolve deployment pods") }
-	msg := cmd()
-	if _,ok := msg.(workloadLogsMsg); !ok { t.Fatalf("got %T",msg) }
+	if len(m.stack)!=2 { t.Fatal("l should resolve before pushing a log view") }
 }
 
 func TestPrimaryDrillDown(t *testing.T) {
