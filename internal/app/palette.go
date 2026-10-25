@@ -111,7 +111,7 @@ func onOff(b bool) string {
 	return "off"
 }
 
-const palettePlaceholder = "resource, namespace, or context"
+const palettePlaceholder = "resource or command"
 
 var (
 	palInputStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("81")).Bold(true)
@@ -125,7 +125,7 @@ var (
 func newPalette() palette {
 	ti := textinput.New()
 	ti.Prompt = " › "
-	ti.Placeholder = "resource, namespace, or context"
+	ti.Placeholder = palettePlaceholder
 	ti.SetVirtualCursor(true)
 	return palette{input: ti}
 }
@@ -145,6 +145,7 @@ func buildItems(resources []k8s.Resource, namespaces, contexts []string, groups 
 	if len(namespaces) > 0 {
 		items = append(items, paletteItem{Kind: itemNamespace, Label: "all namespaces", Detail: "namespace · every namespace at once", Name: "", search: "ns namespace all -a"})
 	}
+	items = append(items, paletteItem{Kind: itemAction, Label: "ns", Detail: "browse namespaces", Name: "namespaces", search: "ns namespace namespaces", exact: []string{"ns"}})
 	for _, ns := range namespaces {
 		items = append(items, paletteItem{Kind: itemNamespace, Label: ns, Detail: "namespace", Name: ns, search: strings.ToLower("ns namespace " + ns)})
 	}
@@ -281,6 +282,16 @@ func (p *palette) filter() {
 		}
 		idx = filtered
 	}
+	if _, namespaceQuery := stripKeyword(strings.ToLower(strings.TrimSpace(p.input.Value())), "ns"); !namespaceQuery {
+		filtered := idx[:0]
+		for _, i := range idx {
+			if p.items[i].Kind == itemNamespace && p.items[i].Name != "" {
+				continue
+			}
+			filtered = append(filtered, i)
+		}
+		idx = filtered
+	}
 	p.matches = idx
 	if scores != nil {
 		sort.SliceStable(p.matches, func(i, j int) bool {
@@ -330,6 +341,20 @@ func (p *palette) update(msg tea.KeyPressMsg) (chosen *paletteItem, closed bool,
 		p.hide()
 		return nil, true, nil
 	case is(msg, keys.Accept):
+		if ns, ok := stripKeyword(strings.TrimSpace(p.input.Value()), "ns"); ok && ns != "" {
+			for _, item := range p.base {
+				if item.Kind == itemNamespace && item.Name == "" && (ns == "all" || ns == "-a") {
+					p.hide()
+					return &item, true, nil
+				}
+			}
+			if it, ok := p.selected(); ok && it.Kind == itemNamespace && it.Name != "" {
+				p.hide()
+				return &it, true, nil
+			}
+			p.hide()
+			return &paletteItem{Kind: itemNamespace, Name: ns}, true, nil
+		}
 		if it, ok := p.selected(); ok {
 			p.hide()
 			return &it, true, nil

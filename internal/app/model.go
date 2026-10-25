@@ -538,6 +538,17 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case membershipMsg:
+		if lv, ok := m.top().(*logsView); ok && lv.id == msg.id {
+			if msg.err != nil {
+				lv.err = msg.err
+			} else {
+				lv.applyMembership(msg.targets)
+			}
+			return m, lv.nextMembership()
+		}
+		return m, nil
+
 	case resourcesMsg:
 		if msg.err != nil {
 			m.err = msg.err
@@ -854,6 +865,18 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			cmd := m.palette.showWith(copyItems(rv.res, ns, row.Name, ctx), "copy…")
 			rv.resize(m.width, m.bodyHeight())
 			return m, cmd
+		case is(msg, keys.Accept) && rv.res.Kind == "Namespace":
+			row, ok := rv.selectedRow()
+			if !ok {
+				return m, nil
+			}
+			m.namespace = row.Name
+			for _, v := range m.stack {
+				v.stop()
+			}
+			m.stack = nil
+			m.pushResource(k8s.Pods)
+			return m, m.startTop()
 		case is(msg, keys.Accept) && isNodes(rv.res):
 			// On nodes, enter drills into the node's pods; d still opens
 			// the detail.
@@ -1194,6 +1217,13 @@ func (m *Model) choose(it paletteItem) tea.Cmd {
 				return m.setNotice("pick a context first")
 			}
 			return m.openClusterEvents()
+		case "namespaces":
+			if res, ok := k8s.ResourceByKind(m.resources, "Namespace", "v1"); ok {
+				m.top().stop()
+				m.pushResource(res)
+				return m.startTop()
+			}
+			return m.setNotice("namespaces are not available")
 		case actionContexts:
 			if _, ok := m.top().(*contextsView); ok {
 				return nil
