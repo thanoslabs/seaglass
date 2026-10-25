@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -78,4 +79,46 @@ func (m Model) handleWorkloadLogs(msg workloadLogsMsg) (tea.Model, tea.Cmd) {
 	cmd := m.startTop()
 	watch := v.watchMembership(m.deps, msg.selector)
 	return m, tea.Batch(cmd, watch)
+}
+
+type membershipMsg struct {
+	id int
+	targets []logTarget
+	err error
+}
+
+// watchMembership follows pod additions and removals for the lifetime of the log view.
+func (v *logsView) watchMembership(d deps, selector string) tea.Cmd {
+	ctx, cancel := context.WithCancel(context.Background())
+	v.memberCancel = cancel
+	updates := d.stream.Stream(ctx, k8s.Pods, v.namespace, "", selector, true)
+	id, get, ns := v.id, d.get, v.namespace
+	return func() tea.Msg {
+		for {
+			select {
+			case <-ctx.Done(): return nil
+			case update, ok := <-updates:
+				if !ok { return nil }
+				if update.Err != nil { return membershipMsg{id:id,err:update.Err} }
+				if update.Status != k8s.StatusLive { continue }
+				var targets []logTarget
+				for _, row := range update.Snapshot.Rows {
+					pod := row.Object
+					if pod == nil {
+						var err error
+						pod, err = get.Get(ctx, k8s.Pods, ns, row.Name)
+						if err != nil { continue }
+					}
+					for _, c := range k8s.Containers(pod) {
+						targets = append(targets, logTarget{pod:row.Name,container:c})
+					}
+				}
+				sort.Slice(targets,func(i,j int)bool {
+					if targets[i].pod != targets[j].pod { return targets[i].pod < targets[j].pod }
+					return targets[i].container < targets[j].container
+				})
+				return membershipMsg{id:id,targets:targets}
+			}
+		}
+	}
 }
