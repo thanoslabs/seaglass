@@ -12,6 +12,8 @@ import (
 type workloadLogsMsg struct {
 	ns, title string
 	targets   []logTarget
+	resource  k8s.Resource
+	selector  string
 	err       error
 }
 
@@ -57,7 +59,7 @@ func (m *Model) resolveWorkloadPods(res k8s.Resource, ns, name string) tea.Cmd {
 				targets = append(targets, logTarget{pod: row.Name, container: container})
 			}
 		}
-		return workloadLogsMsg{ns: ns, title: res.Kind + "/" + name, targets: targets}
+		return workloadLogsMsg{ns: ns, title: res.Kind + "/" + name, targets: targets, resource: res, selector: selector}
 	}
 }
 
@@ -71,6 +73,9 @@ func (m Model) handleWorkloadLogs(msg workloadLogsMsg) (tea.Model, tea.Cmd) {
 	}
 	m.top().stop()
 	m.nextID++
-	m.stack = append(m.stack, newWorkloadLogsView(m.nextID, msg.ns, msg.title, m.saveDir, msg.targets))
-	return m, m.startTop()
+	v := newWorkloadLogsView(m.nextID, msg.ns, msg.title, m.saveDir, msg.targets)
+	m.stack = append(m.stack, v)
+	cmd := m.startTop()
+	watch := v.watchMembership(m.deps, msg.selector)
+	return m, tea.Batch(cmd, watch)
 }
