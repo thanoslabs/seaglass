@@ -346,6 +346,10 @@ func (p *palette) update(msg tea.KeyPressMsg) (chosen *paletteItem, closed bool,
 					return &item, true, nil
 				}
 			}
+			if it, ok := p.selected(); ok && it.Kind == itemNamespace && it.Name != "" {
+				p.hide()
+				return &it, true, nil
+			}
 			p.hide()
 			return &paletteItem{Kind: itemNamespace, Name: ns}, true, nil
 		}
