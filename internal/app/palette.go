@@ -278,7 +278,8 @@ func (p *palette) filter() {
 	if q != "" && scores != nil && !strings.Contains(q, "generat") {
 		for _, i := range idx {
 			it := p.items[i]
-			if it.Kind == itemResource && strings.HasSuffix(strings.ToLower(it.Resource.Kind), "generator") {
+			if it.Kind == itemResource && (strings.HasSuffix(strings.ToLower(it.Resource.Kind), "generator") ||
+				strings.HasPrefix(strings.ToLower(it.Resource.GVR.Group), "generators.")) {
 				scores[i] -= 10000
 			}
 		}
