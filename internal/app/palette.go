@@ -146,6 +146,9 @@ func buildItems(resources []k8s.Resource, namespaces, contexts []string, groups 
 		items = append(items, paletteItem{Kind: itemNamespace, Label: "all namespaces", Detail: "namespace · every namespace at once", Name: "", search: "ns namespace all -a"})
 	}
 	items = append(items, paletteItem{Kind: itemAction, Label: "ns", Detail: "browse namespaces", Name: "namespaces", search: "ns namespace namespaces", exact: []string{"ns"}})
+	for _, ns := range namespaces {
+		items = append(items, paletteItem{Kind: itemNamespace, Label: ns, Detail: "namespace", Name: ns, search: strings.ToLower("ns namespace " + ns)})
+	}
 	for _, c := range contexts {
 		items = append(items, paletteItem{Kind: itemContext, Label: c, Detail: "context · switch cluster", Name: c, search: strings.ToLower("ctx cluster context " + c)})
 	}
@@ -279,6 +282,14 @@ func (p *palette) filter() {
 		}
 		idx = filtered
 	}
+	if _, namespaceQuery := stripKeyword(strings.ToLower(strings.TrimSpace(p.input.Value())), "ns"); !namespaceQuery {
+		filtered := idx[:0]
+		for _, i := range idx {
+			if p.items[i].Kind == itemNamespace && p.items[i].Name != "" { continue }
+			filtered = append(filtered, i)
+		}
+		idx = filtered
+	}
 	p.matches = idx
 	if scores != nil {
 		sort.SliceStable(p.matches, func(i, j int) bool {
@@ -329,8 +340,14 @@ func (p *palette) update(msg tea.KeyPressMsg) (chosen *paletteItem, closed bool,
 		return nil, true, nil
 	case is(msg, keys.Accept):
 		if ns, ok := stripKeyword(strings.TrimSpace(p.input.Value()), "ns"); ok && ns != "" {
+			for _, item := range p.base {
+				if item.Kind == itemNamespace && item.Name == "" && (ns == "all" || ns == "-a") {
+					p.hide()
+					return &item, true, nil
+				}
+			}
 			p.hide()
-			return &paletteItem{Kind:itemNamespace,Name:ns}, true, nil
+			return &paletteItem{Kind: itemNamespace, Name: ns}, true, nil
 		}
 		if it, ok := p.selected(); ok {
 			p.hide()
