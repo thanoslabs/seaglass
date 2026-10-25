@@ -271,6 +271,18 @@ func (p *palette) filter() {
 			}
 		}
 	}
+	// Generator CRDs tend to match broad queries via their API group (for
+	// example external-secrets generators matching "external"). Keep them
+	// searchable, but prefer ordinary resources unless the user explicitly
+	// searches for a generator.
+	if q != "" && scores != nil && !strings.Contains(q, "generat") {
+		for _, i := range idx {
+			it := p.items[i]
+			if it.Kind == itemResource && strings.HasSuffix(strings.ToLower(it.Resource.Kind), "generator") {
+				scores[i] -= 10000
+			}
+		}
+	}
 	if p.hasContexts {
 		filtered := idx[:0]
 		for _, i := range idx {
