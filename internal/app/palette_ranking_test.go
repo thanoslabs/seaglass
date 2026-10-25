@@ -21,12 +21,16 @@ func TestPaletteDeprioritizesGenerators(t *testing.T) {
 		p.input.SetValue(p.input.Value() + string(ch))
 	}
 	p.filter()
-	if len(p.matches) < 2 { t.Fatalf("expected matching resources, got %d", len(p.matches)) }
+	if len(p.matches) < 2 {
+		t.Fatalf("expected matching resources, got %d", len(p.matches))
+	}
 	first := p.items[p.matches[0]]
 	if first.Resource.Kind != "ExternalSecret" {
 		t.Fatalf("external should prefer ExternalSecret, got %s", first.Resource.Kind)
 	}
 	p.input.SetValue("generator")
 	p.filter()
-	if len(p.matches) == 0 { t.Fatal("generator resources should remain searchable") }
+	if len(p.matches) == 0 {
+		t.Fatal("generator resources should remain searchable")
+	}
 }
