@@ -540,7 +540,11 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case membershipMsg:
 		if lv, ok := m.top().(*logsView); ok && lv.id == msg.id {
-			if msg.err != nil { lv.err = msg.err } else { lv.applyMembership(msg.targets) }
+			if msg.err != nil {
+				lv.err = msg.err
+			} else {
+				lv.applyMembership(msg.targets)
+			}
 			return m, lv.nextMembership()
 		}
 		return m, nil
@@ -863,9 +867,13 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		case is(msg, keys.Accept) && rv.res.Kind == "Namespace":
 			row, ok := rv.selectedRow()
-			if !ok { return m, nil }
+			if !ok {
+				return m, nil
+			}
 			m.namespace = row.Name
-			for _, v := range m.stack { v.stop() }
+			for _, v := range m.stack {
+				v.stop()
+			}
 			m.stack = nil
 			m.pushResource(k8s.Pods)
 			return m, m.startTop()

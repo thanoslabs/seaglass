@@ -285,7 +285,9 @@ func (p *palette) filter() {
 	if _, namespaceQuery := stripKeyword(strings.ToLower(strings.TrimSpace(p.input.Value())), "ns"); !namespaceQuery {
 		filtered := idx[:0]
 		for _, i := range idx {
-			if p.items[i].Kind == itemNamespace && p.items[i].Name != "" { continue }
+			if p.items[i].Kind == itemNamespace && p.items[i].Name != "" {
+				continue
+			}
 			filtered = append(filtered, i)
 		}
 		idx = filtered

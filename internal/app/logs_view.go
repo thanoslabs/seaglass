@@ -61,17 +61,17 @@ type logsView struct {
 	pod       string
 	deps      deps
 
-	containers []string    // all display names; nil until fetched
-	targets    []logTarget // when non-nil, streams multiple pods
+	containers        []string    // all display names; nil until fetched
+	targets           []logTarget // when non-nil, streams multiple pods
 	membershipUpdates <-chan k8s.Update
-	membershipCtx context.Context
-	membershipGet getter
-	memberCancel context.CancelFunc
-	generation int
-	active map[string]context.CancelFunc
-	merged chan k8s.LogEvent
-	selected   string      // "" means all containers
-	opts       k8s.LogOptions
+	membershipCtx     context.Context
+	membershipGet     getter
+	memberCancel      context.CancelFunc
+	generation        int
+	active            map[string]context.CancelFunc
+	merged            chan k8s.LogEvent
+	selected          string // "" means all containers
+	opts              k8s.LogOptions
 
 	cancel   context.CancelFunc
 	events   <-chan k8s.LogEvent
@@ -202,7 +202,9 @@ func (v *logsView) restart() tea.Cmd {
 			continue
 		}
 		v.streams++
-		if v.active == nil { v.active = make(map[string]context.CancelFunc) }
+		if v.active == nil {
+			v.active = make(map[string]context.CancelFunc)
+		}
 		v.active[c] = stop
 		go func(ch <-chan k8s.LogEvent, label string) {
 			for ev := range ch {
@@ -633,9 +635,13 @@ func contains(list []string, s string) bool {
 
 // applyMembership reconciles streams without clearing already received log lines.
 func (v *logsView) applyMembership(targets []logTarget) tea.Cmd {
-	if v.cancel == nil { return nil }
+	if v.cancel == nil {
+		return nil
+	}
 	next := make(map[string]logTarget, len(targets))
-	for _, t := range targets { next[t.pod+"/"+t.container] = t }
+	for _, t := range targets {
+		next[t.pod+"/"+t.container] = t
+	}
 	for name, stop := range v.active {
 		if _, ok := next[name]; !ok {
 			stop()
@@ -645,18 +651,27 @@ func (v *logsView) applyMembership(targets []logTarget) tea.Cmd {
 	names := make([]string, 0, len(next))
 	for name, t := range next {
 		names = append(names, name)
-		if _, ok := v.active[name]; ok { continue }
+		if _, ok := v.active[name]; ok {
+			continue
+		}
 		ctx, stop := context.WithCancel(context.Background())
 		ch, err := v.deps.logs.Logs(ctx, v.namespace, t.pod, t.container, v.opts)
-		if err != nil { stop(); v.err = err; continue }
+		if err != nil {
+			stop()
+			v.err = err
+			continue
+		}
 		v.active[name] = stop
 		v.streams++
 		go func(label string, ch <-chan k8s.LogEvent) {
 			for ev := range ch {
-				if !ev.Ended { ev.Line.Container = label }
+				if !ev.Ended {
+					ev.Line.Container = label
+				}
 				select {
 				case v.merged <- ev:
-				case <-ctx.Done(): return
+				case <-ctx.Done():
+					return
 				}
 			}
 		}(name, ch)

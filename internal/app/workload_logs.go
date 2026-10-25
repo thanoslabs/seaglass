@@ -82,9 +82,9 @@ func (m Model) handleWorkloadLogs(msg workloadLogsMsg) (tea.Model, tea.Cmd) {
 }
 
 type membershipMsg struct {
-	id int
+	id      int
 	targets []logTarget
-	err error
+	err     error
 }
 
 // watchMembership follows pod additions and removals for the lifetime of the log view.
@@ -99,28 +99,39 @@ func (v *logsView) watchMembership(d deps, selector string) tea.Cmd {
 	return func() tea.Msg {
 		for {
 			select {
-			case <-ctx.Done(): return nil
+			case <-ctx.Done():
+				return nil
 			case update, ok := <-updates:
-				if !ok { return nil }
-				if update.Err != nil { return membershipMsg{id:id,err:update.Err} }
-				if update.Status != k8s.StatusLive { continue }
+				if !ok {
+					return nil
+				}
+				if update.Err != nil {
+					return membershipMsg{id: id, err: update.Err}
+				}
+				if update.Status != k8s.StatusLive {
+					continue
+				}
 				var targets []logTarget
 				for _, row := range update.Snapshot.Rows {
 					pod := row.Object
 					if pod == nil {
 						var err error
 						pod, err = get.Get(ctx, k8s.Pods, ns, row.Name)
-						if err != nil { continue }
+						if err != nil {
+							continue
+						}
 					}
 					for _, c := range k8s.Containers(pod) {
-						targets = append(targets, logTarget{pod:row.Name,container:c})
+						targets = append(targets, logTarget{pod: row.Name, container: c})
 					}
 				}
-				sort.Slice(targets,func(i,j int)bool {
-					if targets[i].pod != targets[j].pod { return targets[i].pod < targets[j].pod }
+				sort.Slice(targets, func(i, j int) bool {
+					if targets[i].pod != targets[j].pod {
+						return targets[i].pod < targets[j].pod
+					}
 					return targets[i].container < targets[j].container
 				})
-				return membershipMsg{id:id,targets:targets}
+				return membershipMsg{id: id, targets: targets}
 			}
 		}
 	}
@@ -128,26 +139,39 @@ func (v *logsView) watchMembership(d deps, selector string) tea.Cmd {
 
 func (v *logsView) nextMembership() tea.Cmd {
 	ctx, updates, get, id, ns := v.membershipCtx, v.membershipUpdates, v.membershipGet, v.id, v.namespace
-	if ctx == nil { return nil }
+	if ctx == nil {
+		return nil
+	}
 	return func() tea.Msg {
 		for {
 			select {
-			case <-ctx.Done(): return nil
+			case <-ctx.Done():
+				return nil
 			case update, ok := <-updates:
-				if !ok { return nil }
-				if update.Err != nil { return membershipMsg{id:id,err:update.Err} }
-				if update.Status != k8s.StatusLive { continue }
+				if !ok {
+					return nil
+				}
+				if update.Err != nil {
+					return membershipMsg{id: id, err: update.Err}
+				}
+				if update.Status != k8s.StatusLive {
+					continue
+				}
 				var targets []logTarget
 				for _, row := range update.Snapshot.Rows {
 					pod := row.Object
 					if pod == nil {
 						var err error
-						pod, err = get.Get(ctx,k8s.Pods,ns,row.Name)
-						if err != nil { continue }
+						pod, err = get.Get(ctx, k8s.Pods, ns, row.Name)
+						if err != nil {
+							continue
+						}
 					}
-					for _, c := range k8s.Containers(pod) { targets=append(targets,logTarget{pod:row.Name,container:c}) }
+					for _, c := range k8s.Containers(pod) {
+						targets = append(targets, logTarget{pod: row.Name, container: c})
+					}
 				}
-				return membershipMsg{id:id,targets:targets}
+				return membershipMsg{id: id, targets: targets}
 			}
 		}
 	}
